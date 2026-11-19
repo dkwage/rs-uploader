@@ -1,0 +1,67 @@
+name: Build and release
+
+# Push a tag like v1.0.0 to build the macOS and Windows apps and publish them as a GitHub release.
+# Run it by hand (Actions > Build and release > Run workflow) to only build and download the artifacts.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest      # Apple Silicon
+            asset: RS-Uploader-macOS.zip
+          - os: windows-latest
+            asset: RS-Uploader-Windows.zip
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install
+        run: python -m pip install PySide6 keyring pyinstaller pillow
+
+      - name: Self-check
+        run: python rs_api.py
+
+      - name: Build
+        run: pyinstaller --windowed --noconfirm --name "RS Uploader" --icon icon.png --add-data "icon.png:." app.py
+
+      - name: Zip (macOS)
+        if: runner.os == 'macOS'
+        run: ditto -c -k --keepParent "dist/RS Uploader.app" "${{ matrix.asset }}"
+
+      - name: Zip (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: Compress-Archive -Path "dist/RS Uploader" -DestinationPath "${{ matrix.asset }}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset }}
+          path: ${{ matrix.asset }}
+
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: assets
+          merge-multiple: true
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: assets/*.zip
+          generate_release_notes: true
