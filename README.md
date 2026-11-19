@@ -22,9 +22,10 @@ The macOS build is for Apple Silicon Macs (M1 or later). Older versions are on t
    - **Windows:** Chrome may flag the download; open Downloads (Ctrl+J) and keep the file. When
      "Windows protected your PC" appears, click **More info**, then **Run anyway**.
 2. The connection window opens. The URL is already filled in. Enter your GGGI email as the username.
-3. Get your API key: log in to ResourceSpace, go to
-   <https://gggi.resourcespace.com/pages/user/user_profile_edit.php>, click **Show hidden property**
-   next to API key, and paste the key into the app.
+3. Get your API key: log in to ResourceSpace, click the person icon at the top right (My account),
+   then **My Profile**. Click **Show hidden property** next to API key and paste the key into the
+   app. If your profile has no API key, ask your ResourceSpace administrator to enable API access
+   for your account.
 4. Click **Test connection**, then **Save**.
 
 The key is kept in the macOS Keychain (Credential Manager on Windows), not in a file. On a Mac you
@@ -134,3 +135,7 @@ Notes on the API:
   from an existing resource of that type.
 - The server answers in about 0.9 s per call with no rate limit observed up to 16 parallel calls,
   so the app runs lookups 8 at a time and uploads 3 files at a time.
+
+## License
+
+MIT. See [LICENSE](LICENSE).
