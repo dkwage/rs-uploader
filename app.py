@@ -798,7 +798,7 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Upload", "Fields are still loading. Try again in a moment." if self.client
                                 else "Connect to ResourceSpace first (Settings).")
             return
-        todo = [d for d in self.items.values() if d.get("stage") != rs_api.DONE]
+        todo = [d for d in self.items.values() if d.get("stage") != rs_api.DONE and not d.get("duplicate")]
         if not todo:
             QMessageBox.information(self, "Upload", "Nothing to upload.")
             return
@@ -859,8 +859,11 @@ class MainWindow(QMainWindow):
         for w in self.controls:
             w.setEnabled(True)
         self.go.setEnabled(True)
-        failed = sum(1 for d in self.items.values() if d.get("error"))
-        text = f"Done. {failed} failed — press Upload again to retry them." if failed else "All uploaded."
+        dup = sum(1 for d in self.items.values() if d.get("duplicate"))
+        failed = sum(1 for d in self.items.values() if d.get("error") and not d.get("duplicate"))
+        text = f"Done. {failed} failed; press Upload again to retry them." if failed else "All uploaded."
+        if dup:
+            text += f"\n{dup} file(s) were already in ResourceSpace and were skipped."
         QMessageBox.information(self, "Upload", f"{text}\n\nLog: {log}")
 
     def closeEvent(self, e):

@@ -287,20 +287,31 @@ def upload_item(c, item, fields, options, restype, archive, collection, no_exif)
         item["ref"], item["stage"] = int(ref), 0
     ref = item["ref"]
     if item["stage"] < 1:
-        c.upload(ref, item["path"], no_exif)
+        try:
+            c.upload(ref, item["path"], no_exif)
+        except RSError as e:
+            if "duplicate" not in str(e).lower():
+                raise
+            try:  # RS refused the file as a duplicate: don't leave the empty record behind
+                c.call("delete_resource", resource=ref)
+            except RSError:
+                pass
+            item.pop("ref"), item.pop("stage")
+            item["duplicate"] = True  # the app skips it on retry
+            m = re.search(r"resources?:\s*([\d,\s]+)", str(e))
+            raise RSError(f"Already in ResourceSpace (resource {m.group(1).strip() if m else '?'}); skipped") from None
         item["stage"] = 1
     if item["stage"] < 2:  # after the file, so user values win over embedded EXIF/IPTC
-        meta, nodes = effective(fields, item["meta"], item["path"], options), []
+        meta = effective(fields, item["meta"], item["path"], options)
         for f in fields:
             v = meta.get(f["ref"])
             if not v:
                 continue
-            if f["type"] in FIXED_LIST:
-                nodes += v
+            if f["type"] in FIXED_LIST:  # option ids; add_resource_nodes is refused for non-admin users
+                v, extra = ",".join(map(str, v)), {"nodevalues": 1}
             else:
-                _ok(c.call("update_field", resource=ref, field=f["ref"], value=v), f"update_field {f['title']}")
-        if nodes:
-            _ok(c.call("add_resource_nodes", resource=ref, nodestring=",".join(map(str, nodes))), "add_resource_nodes")
+                extra = {}
+            _ok(c.call("update_field", resource=ref, field=f["ref"], value=v, **extra), f"update_field {f['title']}")
         item["stage"] = 2
     if item["stage"] < DONE and collection:
         _ok(c.call("add_resource_to_collection", resource=ref, collection=collection), "add_resource_to_collection")
@@ -373,7 +384,7 @@ if __name__ == "__main__":
         upload_item(f1, item, fields, {}, 1, -1, 55, True)
     except RSError:
         pass
-    assert f1.log == ["create_resource", "upload", "update_field", "add_resource_nodes", "add_resource_to_collection"]
+    assert f1.log == ["create_resource", "upload", "update_field", "update_field", "update_field", "add_resource_to_collection"]
     assert item["ref"] == 101 and item["stage"] == 2
     f2 = Fake()
     upload_item(f2, item, fields, {}, 1, -1, 55, True)  # retry resumes, no duplicate resource
@@ -389,4 +400,16 @@ if __name__ == "__main__":
     assert auto_value(yf, "/x/a.pdf", {"120": [[5, "2005"]]}) is None  # year missing in RS: stays blank
     assert auto_kind({"title": "Year", "type": 4}) is None  # Photo "Year" is a date field: no auto value
     assert auto_hint(vf).startswith("Auto:") and auto_hint({"title": "Region", "type": 3}) == ""
+    class Dup(Fake):  # GGGI RS answer for a file it already has
+        def upload(self, ref, path, no_exif):
+            raise RSError('HTTP 400: {"status":"fail","data":{"message":"Duplicate file upload, '
+                          'file matches resources: 24019"}}')
+
+    d, dup = Dup(), {"path": "/x/IMG_1.jpg", "meta": {12: [7]}}
+    try:
+        upload_item(d, dup, fields, {}, 1, -1, None, True)
+        raise AssertionError("duplicate not reported")
+    except RSError as e:
+        assert str(e) == "Already in ResourceSpace (resource 24019); skipped", e
+    assert d.log == ["create_resource", "delete_resource"] and dup.get("duplicate") and "ref" not in dup
     print("rs_api self-check OK")
