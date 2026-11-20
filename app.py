@@ -1,7 +1,7 @@
 """GGGI ResourceSpace bulk uploader (PySide6 desktop app).
 
-Run:    uv run --with PySide6 --with keyring python app.py
-Build:  uv run --with PySide6 --with keyring --with pyinstaller --with pillow \
+Run:    uv run --with PySide6 --with keyring --with truststore python app.py
+Build:  uv run --with PySide6 --with keyring --with truststore --with pyinstaller --with pillow \
             pyinstaller --windowed --noconfirm --name "RS Uploader" --icon icon.png --add-data "icon.png:." app.py
         -> dist/RS Uploader.app on macOS. Build on Windows for the .exe (PyInstaller does not cross-compile).
 
@@ -13,6 +13,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import keyring
+import truststore
 from PySide6.QtCore import QFileInfo, QObject, QSize, Qt, Signal
 from PySide6.QtGui import QIcon, QImageReader, QPixmap
 from PySide6.QtWidgets import (
@@ -22,6 +23,10 @@ from PySide6.QtWidgets import (
     QScrollArea, QSplitter, QTreeWidget, QTreeWidgetItem, QTreeWidgetItemIterator, QVBoxLayout, QWidget)
 
 import rs_api
+
+# Verify HTTPS against the OS certificate store (Keychain / Windows store). The frozen app's bundled
+# OpenSSL otherwise looks for CA files at the build machine's path -> CERTIFICATE_VERIFY_FAILED.
+truststore.inject_into_ssl()
 
 APP_DIR = Path.home() / ".gggi_uploader"
 CONFIG = APP_DIR / "config.json"
