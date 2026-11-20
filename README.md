@@ -1,6 +1,6 @@
 # RS Uploader
 
-A small desktop app for uploading many files to GGGI's ResourceSpace at once. You pick the files,
+A small desktop app for uploading many files to ResourceSpace at once. You pick the files,
 fill in the metadata once for the whole batch (or for a selection), choose the collection, and press
 Upload. It talks to the ResourceSpace API directly, so you skip the one-file-at-a-time web form.
 
